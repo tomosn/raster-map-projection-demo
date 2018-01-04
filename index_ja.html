@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <meta name="description" content="WebGLを用いたラスタタイル画像の動的な地図投影変換">
+
+    <title>Flat Earth Lab : Azimuthal Equidistant Projection - 正距方位図法</title>
+
+    <link href="./js/lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="./js/lib/bootstrap-toggle/css/bootstrap-toggle.min.css" rel="stylesheet">
+    <link href="./js/lib/assets/css/ie10-viewport-bug-workaround.css" rel="stylesheet">
+    <link href="./css/map-main.css" rel="stylesheet">
+
+  </head>
+
+  <body>
+
+    <div class="container">
+      <div class="row">
+
+        <!--  Controls  -->
+        <div class="col-md-3">
+          <div id="layermenu">
+            <div class="checkbox">
+              <label>
+                <input type="checkbox" checked data-toggle="toggle" data-size="mini" id="cb-graticule" value="vis-graticule">
+                緯度経度線
+              </label>
+            </div>
+            <div class="checkbox">
+              <label>
+                <input type="checkbox" checked data-toggle="toggle" data-size="mini" id="cb-centerpin" value="vis-centerpin">
+                中心（ピン）
+              </label>
+            </div>
+            <div class="checkbox">
+              <label>
+                <input type="checkbox" data-toggle="toggle" data-size="mini" id="cb-circles" value="vis-circles">
+                同心円
+              </label>
+            </div>
+          </div>
+
+          <div class="row-md-10"></div>
+
+          <div id="basemapmenu" class="btn-group-vertical" data-toggle="buttons">
+            <!--
+            <label class="btn btn-primary active">
+              <input id="rb-ne-basemap" type="radio" name="vis-basemap" value="NE" checked>
+              Natural Earth
+            </label>
+          -->
+            <label class="btn btn-primary">
+              <input id="cb-bm-basemap" type="radio" name="vis-basemap" value="BM">
+              Blue Marble
+            </label>
+          </div>
+
+          <div class="card card-outline-primary">
+            <div class="card-block">
+              <blockquote id="messagearea" class="card-blockquote">
+              </blockquote>
+            </div>
+          </div>
+
+          <button title="" type="button" class="btn btn-default"
+                  aria-label="Left Align"
+                  data-original-title="" data-container="body" data-toggle="popover"
+                  data-placement="bottom" data-html="true"
+                  data-content="操作：<ul><li>ダブルクリック：投影中心の移動<li>ドラッグ：平行移動<li>マウスホイール：拡大縮小<li>シングルクリック：中心からのパスとその距離の表示</ul>">
+            <span class="glyphicon glyphicon-question-sign" aria-hidden="true"></span>
+            操作方法
+          </button>
+
+        </div>
+
+        <!--  map canvas  -->
+        <div class="col-md-9">
+          <div id="canvasWrapper" style="text-align: center">
+            <canvas id="webglCanvas" width="100" height="100">
+            </canvas>
+          </div>
+          <div class="copyright">
+            <p>&copy; 2016-2018 www.flatearthlab.com</p>
+          </div>
+        </div>
+
+    </div>
+
+    <!-- ================================================== -->
+    <script src="./js/lib/jquery-1.12.4.min.js" type="application/javascript"></script>
+    <script src="./js/lib/bootstrap/js/bootstrap.min.js" type="application/javascript"></script>
+    <script src="./js/lib/bootstrap-toggle/js/bootstrap-toggle.min.js" type="application/javascript"></script>
+    <script src="./js/lib/hammer.min.js" type="application/javascript"></script>
+    <script src="./js/lib/jquery.hammer.js" type="application/javascript"></script>
+    <script src="./js/lib/webgl-utils.js" type="application/javascript"></script>
+
+    <script src="https://rawgit.com/tomosn/raster-map-projection/master/dist/rasterproj-common.min.js" type="application/javascript"></script>
+    <script src="https://rawgit.com/tomosn/raster-map-projection/master/dist/rasterproj-aeqd.min.js" type="application/javascript"></script>
+    <script src="https://rawgit.com/tomosn/raster-map-projection/master/dist/graticule-renderer.min.js" type="application/javascript"></script>
+    <script src="https://rawgit.com/tomosn/raster-map-projection/master/dist/proj-map.min.js" type="application/javascript"></script>
+    <script src="./js/map-main.min.js" type="application/javascript"></script>
+
+    <script type="application/javascript">
+
+    var lineColorYellow = { r:1.0, g:1.0, b:0.0, a:1.0 };
+    var lineColorRed = { r:1.0, g:0.0, b:0.0, a:1.0 };
+
+    function updateLatLongLayer(view) {
+      view.getLayerById('LatLongLayer').setVisibility($('#cb-graticule').prop('checked'));
+    }
+
+    function updateCenterIconLayer(view) {
+      view.getLayerById('centerIcon').setVisibility($('#cb-centerpin').prop('checked'));
+    }
+
+    function updateCircleLayers(view) {
+      var vis = $('#cb-circles').prop('checked');
+      view.getLayerById('majorCircles').setVisibility(vis);
+      view.getLayerById('minorCircles').setVisibility(vis);
+      view.getLayerById('radialLines').setVisibility(vis);
+    }
+
+
+    $(document).ready(function() {
+      var w = $(window).width();
+      var h = $(window).height();
+      var margin = 20;
+      var canvasSize = (w < h) ? w - margin : h - margin;
+      $('#webglCanvas').attr({ 'width': canvasSize, 'height': canvasSize });
+
+      $('[data-toggle="popover"]').popover();
+
+      $('#cb-graticule').change(function(evt) {
+        updateLatLongLayer(mapView);
+      });
+      $('#cb-centerpin').change(function(evt) {
+        updateCenterIconLayer(mapView);
+      });
+      $('#cb-circles').change(function(evt) {
+        updateCircleLayers(mapView);
+      });
+      $('input[name="vis-basemap"]:radio').change( function(evt) {
+        mapView.getLayerById('NEBaseLayer').setVisibility( $(this).val() == 'NE' );
+        mapView.getLayerById('BMBaseLayer').setVisibility( $(this).val() == 'BM' );
+        mapView.getLayerById('DrawLineLayer').color = ($(this).val() == 'BM') ? lineColorYellow : lineColorRed;
+      });
+
+      var handles = {
+        'onTap': function(xy) {
+          var dist = 6378.137 * Math.sqrt(xy[0]*xy[0] + xy[1]*xy[1]);
+          $('#messagearea').html('Distance:<br>' + dist.toFixed(0) + ' [km]');
+        },
+        'onDoubleTap': function(lp) {
+          $('#messagearea').html('');
+        }
+      };
+
+      //  projCenter parameter
+      var phi0 = +Math.PI/2;
+      var lam0 = 0.0;
+      var projCenter = getProjCenterParameter();
+      if ( projCenter ) {
+        lam0 = projCenter[0];
+        phi0 = projCenter[1];
+      }
+
+      //var baseLayers = makeSelectableBaseLayers();
+      var baseLayers = [ makeSelectableBaseLayers()[1] ];
+      var proj = RasterMapProjection.createProjection(0.0, 0.0);
+      main(proj, { basemap:baseLayers, drawLayer:true, handlers:handles });
+      proj.setProjCenter(lam0, phi0);
+
+      //
+      var col1 = {r:1.0, g:0.0, b:0.0, a:0.9};
+      var col2 = {r:0.75, g:0.0, b:0.0, a:0.45};
+      var majorCirclesLayer = makeConcentricCirclesLayer('majorCircles', [10000.0], col1);
+      var minorCirclesLayer = makeConcentricCirclesLayer('minorCircles', [5000.0, 15000.0], col2);
+      var radialLinesLayer = makeRadialLinesLayer('radialLines', [0, 45, 90, 135, 180, 225, 270, 315], col2);
+
+      var vis = $('#cb-circles').prop('checked');
+      majorCirclesLayer.setVisibility(vis);
+      minorCirclesLayer.setVisibility(vis);
+      radialLinesLayer.setVisibility(vis);
+
+      var drawLineLayer = makeDrawLineLayer(lineColorRed);
+
+      mapView.addLayer(majorCirclesLayer);
+      mapView.addLayer(minorCirclesLayer);
+      mapView.addLayer(radialLinesLayer);
+
+      mapView.addLayer(drawLineLayer);
+    });
+
+    </script>
+
+  </body>
+</html>
