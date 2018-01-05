@@ -47,12 +47,10 @@
           <div class="row-md-10"></div>
 
           <div id="basemapmenu" class="btn-group-vertical" data-toggle="buttons">
-            <!--
             <label class="btn btn-primary active">
               <input id="rb-ne-basemap" type="radio" name="vis-basemap" value="NE" checked>
               Natural Earth
             </label>
-          -->
             <label class="btn btn-primary">
               <input id="cb-bm-basemap" type="radio" name="vis-basemap" value="BM">
               Blue Marble
@@ -168,8 +166,7 @@
         phi0 = projCenter[1];
       }
 
-      //var baseLayers = makeSelectableBaseLayers();
-      var baseLayers = [ makeSelectableBaseLayers()[1] ];
+      var baseLayers = makeSelectableBaseLayers();
       var proj = RasterMapProjection.createProjection(0.0, 0.0);
       main(proj, { basemap:baseLayers, drawLayer:true, handlers:handles });
       proj.setProjCenter(lam0, phi0);
