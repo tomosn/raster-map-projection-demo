@@ -55,6 +55,10 @@
               <input id="cb-bm-basemap" type="radio" name="vis-basemap" value="BM">
               Blue Marble
             </label>
+            <label class="btn btn-primary">
+              <input id="cb-ag-basemap" type="radio" name="vis-basemap" value="VI">
+              VIIRS Corrected Reflectance
+            </label>
           </div>
 
           <div class="card card-outline-primary">
@@ -143,7 +147,8 @@
       });
       $('input[name="vis-basemap"]:radio').change( function(evt) {
         mapView.getLayerById('NEBaseLayer').setVisibility( $(this).val() == 'NE' );
-        mapView.getLayerById('BMBaseLayer').setVisibility( $(this).val() == 'BM' );
+        mapView.getLayerById('BlueMarble').setVisibility( $(this).val() == 'BM' );
+        mapView.getLayerById('VIIRS').setVisibility( $(this).val() == 'VI' );
         mapView.getLayerById('DrawLineLayer').color = ($(this).val() == 'BM') ? lineColorYellow : lineColorRed;
       });
 
