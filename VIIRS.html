@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <meta name="description" content="On-the-fly map projection of raster tiles using WebGL (Azimuthal Equidistant Projection) : fullwindow version">
+
+    <title>Flat Earth Lab : Azimuthal Equidistant Projection (fullwindow version)</title>
+
+    <link href="./js/lib/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="./js/lib/bootstrap-toggle/css/bootstrap-toggle.min.css" rel="stylesheet">
+    <link href="./js/lib/bootstrap-datetimepicker/css/bootstrap-datetimepicker.min.css" rel="stylesheet">
+    <link href="./js/lib/assets/css/ie10-viewport-bug-workaround.css" rel="stylesheet">
+    <link href="./css/map-main.css" rel="stylesheet">
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-78810725-1', 'auto');
+  ga('send', 'pageview');
+
+    </script>
+
+  </head>
+
+  <body>
+
+    <div class="container">
+      <div class="row">
+
+        <!--  Controls  -->
+        <div class="col-md-3">
+          <div id="layermenu">
+            <div class="checkbox">
+              <label>
+                <input type="checkbox" checked data-toggle="toggle" data-size="mini" id="cb-graticule" value="vis-graticule">
+                Graticule
+              </label>
+            </div>
+            <div class="checkbox">
+              <label>
+                <input type="checkbox" checked data-toggle="toggle" data-size="mini" id="cb-centerpin" value="vis-centerpin">
+                Center Pin
+              </label>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-2">
+              <button type="button" class="btn btn-default btn-circle" id="btn-date-prev">&lt;</button>
+            </div>
+            <div class="col-md-8">
+              <input type="text" class="form-control" id="datepicker" />
+            </div>
+            <div class="col-md-2">
+              <button type="button" class="btn btn-default btn-circle" id="btn-date-next" >&gt;</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!--  map canvas  -->
+        <div class="col-md-9">
+          <div id="canvasWrapper" style="text-align: center">
+            <canvas id="webglCanvas" width="100" height="100">
+            </canvas>
+          </div>
+          <div class="copyright">
+            <p>&copy; 2016-2018 www.flatearthlab.com</p>
+          </div>
+        </div>
+
+    </div>
+
+    <!-- ================================================== -->
+    <script src="./js/lib/jquery-1.12.4.min.js" type="application/javascript"></script>
+    <script src="./js/lib/moment-with-locales.min.js" type="application/javascript"></script>
+    <script src="./js/lib/bootstrap/js/bootstrap.min.js" type="application/javascript"></script>
+    <script src="./js/lib/bootstrap-toggle/js/bootstrap-toggle.min.js" type="application/javascript"></script>
+    <script src="./js/lib/bootstrap-datetimepicker/js/bootstrap-datetimepicker.min.js" type="application/javascript"></script>
+    <script src="./js/lib/hammer.min.js" type="application/javascript"></script>
+    <script src="./js/lib/jquery.hammer.js" type="application/javascript"></script>
+    <script src="./js/lib/webgl-utils.js" type="application/javascript"></script>
+
+    <script src="./js/rasterproj-common.min.js" type="application/javascript"></script>
+    <script src="./js/rasterproj-aeqd.min.js" type="application/javascript"></script>
+    <script src="./js/graticule-renderer.min.js" type="application/javascript"></script>
+    <script src="./js/proj-map.min.js" type="application/javascript"></script>
+    <script src="./js/map-main.min.js" type="application/javascript"></script>
+
+
+    <script type="application/javascript">
+
+    function updateLatLongLayer(view) {
+      view.getLayerById('LatLongLayer').setVisibility($('#cb-graticule').prop('checked'));
+    }
+
+    function updateCenterIconLayer(view) {
+      view.getLayerById('centerIcon').setVisibility($('#cb-centerpin').prop('checked'));
+    }
+
+    function makeVIIRSLayer(layerId) {
+      var tileOpts = {
+        rootNumX: 2,
+        rootNumY: 1,
+        rootTileSizeX: Math.PI * 288.0 / 180.0,
+        rootTileSizeY: Math.PI * 288.0 / 180.0,
+        numLevels: 4,
+        tileOrigin: [ -Math.PI, +Math.PI/2 ],
+        inverseY: true
+      };
+      var cacheOpts = {
+        num: 50,
+        crossOrigin: 'anonymous'
+      };
+      var style = {
+        opacity : 1.0
+      };
+      var layer = new TileTextureLayer(layerId, ProjShaderProgram.COORD_TYPE_DATA, style, tileOpts, cacheOpts);
+
+      layer.setDataLevelDef(function(window, dataRect) {
+        var w = window[2] - window[0];
+        var h = window[3] - window[1];
+        var length = Math.sqrt(w * h);
+        if ( Math.PI <= length )     return 0;
+        if ( Math.PI/2 <= length )   return 1;
+        if ( Math.PI/4 <= length )   return 2;
+        return 3;
+      });
+
+      return layer;
+    }
+
+    function updateDate(view, timeStr) {
+      var baseUrl = 'https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/';
+      var layer = view.getLayerById('VIIRS');
+      layer.setTileUrlDef(function(level, ix, iy) {
+        return baseUrl + timeStr + '/250m/' + level + '/' + iy + '/' + ix + '.jpeg';
+      });
+      layer.invalidate();
+    }
+
+    $(document).ready(function() {
+      var w = $(window).width();
+      var h = $(window).height();
+      var margin = 20;
+      var canvasSize = (w < h) ? w - margin : h - margin;
+      $('#webglCanvas').attr({ 'width': canvasSize, 'height': canvasSize });
+
+      $('#cb-graticule').change(function(evt) {
+        updateLatLongLayer(mapView);
+      });
+      $('#cb-centerpin').change(function(evt) {
+        updateCenterIconLayer(mapView);
+      });
+
+      $('#datepicker').datetimepicker({
+         locale: 'en',
+         format: 'YYYY-MM-DD',
+         minDate: moment('2015-11-24'),
+         maxDate: moment().add(+1, 'days')
+      });
+      $('#datepicker').on('dp.change', function(evt) {
+        updateDate(mapView, evt.date.format('YYYY-MM-DD'));
+      });
+      $('#btn-date-prev').on('click', function(evt) {
+        var dp = $('#datepicker').data("DateTimePicker");
+        dp.date(dp.date().add(-1, 'days'));
+      });
+      $('#btn-date-next').on('click', function(evt) {
+        var dp = $('#datepicker').data("DateTimePicker");
+        dp.date(dp.date().add(+1, 'days'));
+      });
+
+      //  projCenter parameter
+      var phi0 = +Math.PI/2;
+      var lam0 = 0.0;
+      var projCenter = getProjCenterParameter();
+      if ( projCenter ) {
+        lam0 = projCenter[0];
+        phi0 = projCenter[1];
+      }
+
+      var layer = makeVIIRSLayer('VIIRS');
+
+      var proj = RasterMapProjection.createProjection(0.0, 0.0);
+      main(proj, { basemap: [ layer ], drawLayer:false });
+      proj.setProjCenter(lam0, phi0);
+
+      var yesterday = moment().add(-1, 'days');
+      $('#datepicker').data("DateTimePicker").date(yesterday);
+    });
+
+    </script>
+
+  </body>
+</html>
