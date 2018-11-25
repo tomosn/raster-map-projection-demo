@@ -39,6 +39,17 @@
             </div>
           </div>
 
+          <div id="modemenu" class="btn-group btn-group-toggle" data-toggle="buttons">
+            <label class="btn btn-primary active">
+              <input id="rb-translate-mode" type="radio" name="move-mode" value="translate" checked>
+              Translate
+            </label>
+            <label class="btn btn-primary">
+              <input id="rb-rotate-mode" type="radio" name="move-mode" value="rotate">
+              Rotate
+            </label>
+          </div>
+
           <div class="row">
             <div class="col-md-2">
               <button type="button" class="btn btn-default btn-circle" id="btn-date-prev">&lt;</button>
@@ -112,13 +123,10 @@
       };
       var layer = new TileTextureLayer(layerId, ProjShaderProgram.COORD_TYPE_DATA, style, tileOpts, cacheOpts);
 
-      layer.setDataLevelDef(function(window, dataRect) {
-        var w = window[2] - window[0];
-        var h = window[3] - window[1];
-        var length = Math.sqrt(w * h);
-        if ( Math.PI <= length )     return 0;
-        if ( Math.PI/2 <= length )   return 1;
-        if ( Math.PI/4 <= length )   return 2;
+      layer.setDataLevelDef(function(viewWindowScale, dataRect) {
+        if ( Math.PI <= viewWindowScale )     return 0;
+        if ( Math.PI/2 <= viewWindowScale )   return 1;
+        if ( Math.PI/4 <= viewWindowScale )   return 2;
         return 3;
       });
 
@@ -146,6 +154,10 @@
       });
       $('#cb-centerpin').change(function(evt) {
         updateCenterIconLayer(mapView);
+      });
+
+      $('input[name="move-mode"]:radio').change( function(evt) {
+        viewStatus.isRotateMode = ( $(this).val() == 'rotate' );
       });
 
       $('#datepicker').datetimepicker({

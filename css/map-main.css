@@ -12,6 +12,12 @@ body {
   margin-bottom:20px;
 }
 
+#modemenu {
+  color: #E0E0E0;
+  font-size: 10pt;
+  margin-bottom:20px;
+}
+
 #basemapmenu {
   /* position: absolute;
   top: 120px;

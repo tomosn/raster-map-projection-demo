@@ -44,7 +44,16 @@
             </div>
           </div>
 
-          <div class="row-md-10"></div>
+          <div id="modemenu" class="btn-group btn-group-toggle" data-toggle="buttons">
+            <label class="btn btn-primary active">
+              <input id="rb-translate-mode" type="radio" name="move-mode" value="translate" checked>
+              Translate
+            </label>
+            <label class="btn btn-primary">
+              <input id="rb-rotate-mode" type="radio" name="move-mode" value="rotate">
+              Rotate
+            </label>
+          </div>
 
           <div id="basemapmenu" class="btn-group-vertical" data-toggle="buttons">
             <label class="btn btn-primary active">
@@ -72,7 +81,7 @@
                   aria-label="Left Align"
                   data-original-title="" data-container="body" data-toggle="popover"
                   data-placement="bottom" data-html="true"
-                  data-content="Directions:<ul><li>Double tap: <br>Move the center of projection.<li>Pan: <br>Translate maps.<li>Mouse Wheel Scroll: <br>Zoom in or zoom out on maps.<li>Tap: <br>Display the shortest path between the center and the tapped point. Also, calculate the distance between these points.</ul>">
+                  data-content="Directions:<ul><li>Double tap: <br>Move the center of projection.<li>Pan: <br>Translate or rotate maps.<li>Mouse Wheel Scroll: <br>Zoom in or zoom out on maps.<li>Tap: <br>Display the shortest path between the center and the tapped point. Also, calculate the distance between these points.</ul>">
             <span class="glyphicon glyphicon-question-sign" aria-hidden="true"></span>
             Usage
           </button>
@@ -150,6 +159,10 @@
         mapView.getLayerById('BlueMarble').setVisibility( $(this).val() == 'BM' );
         mapView.getLayerById('VIIRS').setVisibility( $(this).val() == 'VI' );
         mapView.getLayerById('DrawLineLayer').color = ($(this).val() == 'BM') ? lineColorYellow : lineColorRed;
+      });
+
+      $('input[name="move-mode"]:radio').change( function(evt) {
+        viewStatus.isRotateMode = ( $(this).val() == 'rotate' );
       });
 
       var handles = {
